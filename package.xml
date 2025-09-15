@@ -16,7 +16,8 @@
   <depend>eigen3_cmake_module</depend>
   <depend>eigen3</depend>
   <depend>vrpn_mocap</depend>
-
+  <depend>unitree_hg</depend>
+  
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

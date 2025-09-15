@@ -11,12 +11,8 @@ ros2 topic echo /vrpn_mocap/MCServer/pose300
 ros2 param get /vrpn_mocap/vrpn_mocap_client_node multi_sensor
 
 
-
-
-colcon build --packages-select vrpn_urdf
-ros2 launch vrpn_urdf vrpn_topic_test.launch.py
-ros2 launch vrpn_urdf vrpn_g1_controller.launch.py
-
-source ~/unitree_ros2/setup_local.sh # Use the local network card
-export ROS_DOMAIN_ID=1 # Modify the domain id to match the simulation
-./install/stand_go2/bin/stand_go2 # Run
+# motion_robot
+source ~/dev/unitree/unitree_ros2/setup.sh 
+source install/setup.bash
+export ROS_DOMAIN_ID=0
+./install/motion_robot/bin/vrpn_test_node

@@ -20,6 +20,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(unitree_hg REQUIRED)
 
 # 包含Eigen头文件
 include_directories(${EIGEN3_INCLUDE_DIRS})
@@ -36,19 +37,11 @@ add_executable(vrpn_topic_test
 # 添加新的测试节点
 add_executable(vrpn_test_node 
   src/vrpn_test_node.cpp
-  src/joint_mapper.cpp
+  src/motion_robot.cpp
+  src/g1_controller.cpp
+  src/motor_crc.cpp
   src/topic_data_getter.cpp
 )
-
-# 设置依赖
-# ament_target_dependencies(vrpn_g1_controller 
-#   rclcpp 
-#   std_msgs 
-#   geometry_msgs 
-#   unitree_hg
-#   sensor_msgs
-#   eigen3
-# )
 
 ament_target_dependencies(vrpn_topic_test 
   rclcpp 
@@ -62,40 +55,24 @@ ament_target_dependencies(vrpn_test_node
   std_msgs 
   geometry_msgs
   sensor_msgs
-  eigen3_cmake_module
+  unitree_hg
+  Eigen3
 )
-
-# 链接Eigen库
-target_link_libraries(vrpn_test_node ${EIGEN3_LIBRARIES})
-
-
-# 安装可执行文件
-# install(TARGETS 
-#   vrpn_g1_controller
-#   vrpn_topic_test
-#   DESTINATION bin/${PROJECT_NAME}
-# )
-
-install(TARGETS vrpn_topic_test vrpn_test_node)
-
-# install(TARGETS vrpn_g1_controller
-#   DESTINATION bin/vrpn_g1_controller
-# )
 
 # 安装头文件
 install(DIRECTORY include/
   DESTINATION include
 )
+ 
+install(TARGETS vrpn_test_node)
 
-# 安装launch文件（如果存在）
-# install(DIRECTORY launch/
-#   DESTINATION share/${PROJECT_NAME}/launch
-# )
+install(TARGETS vrpn_topic_test)
 
-# 安装配置文件（如果存在）
-# install(DIRECTORY config/
-#   DESTINATION share/${PROJECT_NAME}/config
-# )
+
+# 安装launch文件
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
