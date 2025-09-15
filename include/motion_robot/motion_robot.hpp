@@ -63,6 +63,8 @@ private:
     // VRPN数据回调
     void onVrpnData(int sensor_id, float joint_angle);
     
+    // 根位置数据回调已移除
+    
     // 打印状态信息
     void printStatus();
 };

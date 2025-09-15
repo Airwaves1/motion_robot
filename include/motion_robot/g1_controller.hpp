@@ -136,11 +136,7 @@ public:
     bool simulateVrpnPoseData(int sensor_id, double quaternion_x, double quaternion_y, 
                                double quaternion_z, double quaternion_w);
     
-    /**
-     * @brief 启动手臂摇摆动作模拟
-     * @param enable 是否启用模拟
-     */
-    void enableArmSwingSimulation(bool enable = true);
+    // 手臂摇摆模拟功能已移除 - 专注于动补控制
     
     
     /**
@@ -231,16 +227,13 @@ private:
     
     
     // VRPN模拟参数
-    bool enable_arm_swing_simulation_;
-    double arm_swing_time_;
-    double arm_swing_frequency_;
-    double arm_swing_amplitude_;
+    // 手臂摇摆模拟功能已移除 - 专注于动补控制
     
     // 内部方法
     void onLowState(const unitree_hg::msg::LowState::SharedPtr msg);
     void controlTimerCallback();
     void initMotorCommands();
-    void executeArmSwingSimulation();
+    // 手臂摇摆模拟功能已移除 - 专注于动补控制
     void quaternionToEulerAngles(double qx, double qy, double qz, double qw, 
                                 double& roll, double& pitch, double& yaw);
     void mapSensorToJointAngles(int sensor_id, double roll, double pitch, double yaw, 
