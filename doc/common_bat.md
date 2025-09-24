@@ -16,3 +16,6 @@ source ~/dev/unitree/unitree_ros2/setup.sh
 source install/setup.bash
 export ROS_DOMAIN_ID=0
 ./install/motion_robot/bin/motion_robot_node
+
+# npy
+npy格式的定义是，前七位根关节姿态，后面就是每个骨骼的旋转弧度值
