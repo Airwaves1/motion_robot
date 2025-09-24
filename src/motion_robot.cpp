@@ -15,7 +15,7 @@ MotionRobot::MotionRobot() : Node("motion_robot") {
     sensor_id_offset_ = this->get_parameter("sensor_id_offset").as_int();
     num_sensors_ = this->get_parameter("num_sensors").as_int();
     print_frequency_ = this->get_parameter("print_frequency").as_double();
-    bool continuous_mode = this->get_parameter("enable_continuous_mode").as_bool();
+    (void)this->get_parameter("enable_continuous_mode");
     
     // 设置启动时间
     start_time_ = this->get_clock()->now();
@@ -29,9 +29,6 @@ MotionRobot::MotionRobot() : Node("motion_robot") {
         [this]() { this->printStatus(); }
     );
     
-    RCLCPP_INFO(this->get_logger(), "MotionRobot已启动 - 传感器: %d个, 跟踪器: %s", 
-               num_sensors_, vrpn_tracker_name_.c_str());
-    RCLCPP_INFO(this->get_logger(), "运行模式: %s", continuous_mode ? "持续运行" : "测试模式");
     
     // 延迟初始化TopicDataGetter和G1控制器
     initializeDataGetter();
@@ -76,10 +73,6 @@ void MotionRobot::initializeG1Controller() {
     // 启用所有电机
     g1_controller_->enableMotor(-1, true);
     
-    // 启用手臂摇摆模拟（测试用，已关闭）
-    // g1_controller_->enableArmSwingSimulation(true);
-    
-    RCLCPP_INFO(this->get_logger(), "G1Controller初始化完成");
 }
 
 void MotionRobot::onVrpnData(int sensor_id, float /* joint_angle */) {
@@ -92,7 +85,7 @@ void MotionRobot::onVrpnData(int sensor_id, float /* joint_angle */) {
             
             // 将pose数据转换为四元数并传递给G1控制器
             int joint_id = sensor_id - sensor_id_offset_;
-            bool success = g1_controller_->simulateVrpnPoseData(
+            (void)g1_controller_->simulateVrpnPoseData(
                 joint_id,  // 转换为0-28的关节ID
                 pose.orientation.x,
                 pose.orientation.y,
@@ -100,16 +93,6 @@ void MotionRobot::onVrpnData(int sensor_id, float /* joint_angle */) {
                 pose.orientation.w
             );
             
-            // 添加调试信息 - 显示所有关节
-            if (success) {
-                RCLCPP_INFO(this->get_logger(), "VRPN数据驱动 - 传感器%d->关节%d: 四元数(%.3f,%.3f,%.3f,%.3f)", 
-                            sensor_id, joint_id, pose.orientation.x, pose.orientation.y, 
-                            pose.orientation.z, pose.orientation.w);
-            } else {
-                RCLCPP_WARN(this->get_logger(), "VRPN数据处理失败 - 传感器%d->关节%d", sensor_id, joint_id);
-            }
-        } else {
-            RCLCPP_WARN(this->get_logger(), "未找到传感器%d的pose数据", sensor_id);
         }
     }
 }
@@ -137,29 +120,8 @@ void MotionRobot::printStatus() {
                      ", 运行时间: " + std::to_string(static_cast<int>(elapsed_time)) + "s";
     status_pub_->publish(status_msg);
     
-    // 打印简要状态
-    RCLCPP_INFO(this->get_logger(), "运行状态: %d/%d传感器, %d消息, %.1fs", 
-               received_sensors, num_sensors_, total_messages, elapsed_time);
     
-    // 只显示未接收数据的传感器（每10次打印一次，避免日志过多）
-    static int print_count = 0;
-    print_count++;
-    if (print_count % 10 == 0) {
-        bool has_missing_sensors = false;
-        for (int i = 0; i < num_sensors_; i++) {
-            int sensor_id = sensor_id_offset_ + i;
-            auto stats = data_getter_->getSensorStats(sensor_id);
-            if (!stats.has_received) {
-                if (!has_missing_sensors) {
-                    RCLCPP_WARN(this->get_logger(), "未接收数据的传感器:");
-                    has_missing_sensors = true;
-                }
-                RCLCPP_WARN(this->get_logger(), "  传感器 %d", sensor_id);
-            }
-        }
-    }
 }
 
-// endTest函数已移除 - 系统现在持续运行
 
 } // namespace motion_robot

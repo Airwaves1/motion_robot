@@ -50,18 +50,6 @@ public:
      */
     void stopDataCollection();
     
-    /**
-     * @brief 获取指定传感器的最新关节角度
-     * @param sensor_id 传感器ID
-     * @return 关节角度（弧度），如果传感器不存在则返回0
-     */
-    float getJointAngle(int sensor_id);
-    
-    /**
-     * @brief 获取所有传感器的关节角度
-     * @return 关节角度映射表
-     */
-    std::map<int, float> getAllJointAngles();
     
     /**
      * @brief 获取指定传感器的原始pose数据
@@ -123,13 +111,6 @@ public:
      */
     void setTestStartTime(const rclcpp::Time& start_time) { test_start_time_ = start_time; }
     
-    /**
-     * @brief 将四元数转换为欧拉角（弧度）
-     * @param qx, qy, qz, qw 四元数分量
-     * @param roll, pitch, yaw 输出的欧拉角（弧度）
-     */
-    void quaternionToEuler(double qx, double qy, double qz, double qw, 
-                          double& roll, double& pitch, double& yaw);
 
 private:
     // 配置参数
@@ -141,8 +122,6 @@ private:
     // ROS2接口
     rclcpp::Node* node_;
     std::vector<rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr> vrpn_subs_;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
-    rclcpp::TimerBase::SharedPtr status_timer_;
     
     // 数据存储
     std::map<int, geometry_msgs::msg::PoseStamped::SharedPtr> latest_poses_;
@@ -160,10 +139,6 @@ private:
     void createVrpnSubscriptions();
     void onVrpnPose(const geometry_msgs::msg::PoseStamped::SharedPtr msg, int sensor_id);
     void updateSensorStats(int sensor_id, const rclcpp::Time& timestamp);
-    void publishStatus();
-    
-    // 定时器回调
-    void statusTimerCallback();
 };
 
 } // namespace motion_robot

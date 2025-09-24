@@ -15,7 +15,6 @@ G1Controller::G1Controller(rclcpp::Node* node)
         motor_enabled_[i] = false;
     }
     
-    RCLCPP_INFO(node_->get_logger(), "G1Controller已创建");
 }
 
 bool G1Controller::initialize() {
@@ -40,7 +39,6 @@ bool G1Controller::initialize() {
         // 初始化电机命令
         initMotorCommands();
         
-        RCLCPP_INFO(node_->get_logger(), "G1Controller初始化完成 - 控制频率: %.1f Hz", control_frequency_);
         return true;
         
     } catch (const std::exception& e) {
@@ -91,7 +89,6 @@ bool G1Controller::setJointPosition(int joint_id, float position) {
     
     // 限位检查
     if (!isJointInLimit(joint_id, position)) {
-        RCLCPP_WARN(node_->get_logger(), "关节 %d 位置 %.3f 超出限位", joint_id, position);
         clampJointPosition(joint_id, position);
     }
     
@@ -194,7 +191,6 @@ bool G1Controller::setControlMode(uint8_t mode) {
         }
     }
     
-    RCLCPP_INFO(node_->get_logger(), "控制模式设置为: 0x%02X", mode);
     return true;
 }
 
@@ -291,7 +287,6 @@ bool G1Controller::isJointInLimit(int joint_id, float position) const {
 
 void G1Controller::setControlFrequency(double frequency) {
     if (frequency <= 0 || frequency > 1000) {
-        RCLCPP_WARN(node_->get_logger(), "控制频率 %.1f Hz 超出合理范围 [1, 1000]", frequency);
         return;
     }
     
@@ -305,7 +300,6 @@ void G1Controller::setControlFrequency(double frequency) {
         );
     }
     
-    RCLCPP_INFO(node_->get_logger(), "控制频率设置为: %.1f Hz", control_frequency_);
 }
 
 bool G1Controller::validateJointId(int joint_id) const {
@@ -332,156 +326,35 @@ void G1Controller::setSafeStandingPose() {
         low_cmd_.motor_cmd[i].kd = 1.0f;
     }
     
-    RCLCPP_INFO(node_->get_logger(), "设置安全站立姿态 - 所有关节为0度");
 }
 
 
 bool G1Controller::processQuaternionData(int joint_id, double quaternion_x, double quaternion_y, 
                                          double quaternion_z, double quaternion_w) {
     if (joint_id < 0 || joint_id >= G1_NUM_MOTOR) {
-        RCLCPP_WARN(node_->get_logger(), "无效的关节ID: %d", joint_id);
         return false;
     }
-    
-    // 检查四元数是否有效
-    double quat_magnitude = std::sqrt(quaternion_x*quaternion_x + quaternion_y*quaternion_y + 
-                                     quaternion_z*quaternion_z + quaternion_w*quaternion_w);
-    if (quat_magnitude < 0.1) {
-        RCLCPP_WARN(node_->get_logger(), "关节%d: 四元数幅度过小 (%.6f)，跳过处理", joint_id, quat_magnitude);
+
+    // 直接使用传入四元数的第一个分量作为已转换的关节角度
+    float angle = static_cast<float>(quaternion_x);
+
+    // 若角度过小，可直接忽略（避免噪声）
+    if (std::abs(angle) < 0.0001f) {
         return false;
     }
-    
-    // 将四元数转换为欧拉角
-    double roll, pitch, yaw;
-    quaternionToEulerAngles(quaternion_x, quaternion_y, quaternion_z, quaternion_w, 
-                           roll, pitch, yaw);
-    
-    // 检查欧拉角是否有效
-    if (std::isnan(roll) || std::isnan(pitch) || std::isnan(yaw) ||
-        std::isinf(roll) || std::isinf(pitch) || std::isinf(yaw)) {
-        RCLCPP_WARN(node_->get_logger(), "关节%d: 欧拉角转换失败 (roll=%.3f, pitch=%.3f, yaw=%.3f)", 
-                    joint_id, roll, pitch, yaw);
-        return false;
+
+    // 限幅
+    if (!isJointInLimit(joint_id, angle)) {
+        clampJointPosition(joint_id, angle);
     }
-    
-    // 映射关节数据到关节角度
-    std::map<int, float> joint_angles;
-    mapSensorToJointAngles(joint_id, roll, pitch, yaw, joint_angles);
-    
-    // 检查映射结果
-    if (joint_angles.empty()) {
-        RCLCPP_WARN(node_->get_logger(), "关节%d: 映射后无有效角度", joint_id);
-        return false;
-    }
-    
-    // 应用关节角度到电机命令
-    int valid_angles = 0;
-    for (const auto& pair : joint_angles) {
-        int target_joint_id = pair.first;
-        float angle = pair.second;
-        
-        if (validateJointId(target_joint_id)) {
-            // 检查角度是否为0或接近0
-            if (std::abs(angle) < 0.0001f) {  // 降低阈值，让更多小角度通过
-                RCLCPP_DEBUG(node_->get_logger(), "关节%d: 角度接近0 (%.6f)，跳过", target_joint_id, angle);
-                continue;
-            }
-            
-            // 检查角度是否在限制范围内
-            if (!isJointInLimit(target_joint_id, angle)) {
-                RCLCPP_WARN(node_->get_logger(), "关节%d: 角度%.3f超出限制 [%.3f, %.3f]", 
-                           target_joint_id, angle, G1_JOINT_LIMIT[target_joint_id][0], G1_JOINT_LIMIT[target_joint_id][1]);
-                clampJointPosition(target_joint_id, angle);
-                RCLCPP_INFO(node_->get_logger(), "关节%d: 角度已限制到%.3f", target_joint_id, angle);
-            }
-            
-            low_cmd_.motor_cmd[target_joint_id].q = angle;
-            low_cmd_.motor_cmd[target_joint_id].mode = 1;  // 启用电机
-            low_cmd_.motor_cmd[target_joint_id].kp = (target_joint_id < 13) ? 100.0f : 50.0f;
-            low_cmd_.motor_cmd[target_joint_id].kd = 1.0f;
-            valid_angles++;
-        }
-    }
-    
-    // 添加调试信息 - 显示关节响应轴和欧拉角值
-    std::string response_axis = "";
-    double response_value = 0.0;
-    
-    // 根据关节类型确定响应的轴
-    if (joint_id >= 0 && joint_id <= 11) {  // 腿部关节
-        switch (joint_id) {
-            case 0: case 6: case 3: case 4: case 9: case 10:  // 俯仰关节
-                response_axis = "pitch";
-                response_value = pitch;
-                break;
-            case 1: case 7: case 5: case 11:  // 横滚关节
-                response_axis = "roll";
-                response_value = roll;
-                break;
-            case 2: case 8:  // 偏航关节
-                response_axis = "yaw";
-                response_value = yaw;
-                break;
-        }
-    } else if (joint_id >= 12 && joint_id <= 14) {  // 躯干关节
-        switch (joint_id) {
-            case 12:  // 腰部偏航
-                response_axis = "yaw";
-                response_value = yaw;
-                break;
-            case 13:  // 腰部横滚
-                response_axis = "roll";
-                response_value = roll;
-                break;
-            case 14:  // 腰部俯仰
-                response_axis = "pitch";
-                response_value = pitch;
-                break;
-        }
-    } else if (joint_id >= 15 && joint_id <= 21) {  // 左臂关节
-        switch (joint_id) {
-            case 15: case 18: case 20:  // 俯仰关节
-                response_axis = "pitch";
-                response_value = pitch;
-                break;
-            case 16: case 19:  // 横滚关节
-                response_axis = "roll";
-                response_value = roll;
-                break;
-            case 17: case 21:  // 偏航关节
-                response_axis = "yaw";
-                response_value = yaw;
-                break;
-        }
-    } else if (joint_id >= 22 && joint_id <= 28) {  // 右臂关节
-        switch (joint_id) {
-            case 22: case 25: case 27:  // 俯仰关节
-                response_axis = "pitch";
-                response_value = pitch;
-                break;
-            case 23: case 26:  // 横滚关节
-                response_axis = "roll";
-                response_value = roll;
-                break;
-            case 24: case 28:  // 偏航关节
-                response_axis = "yaw";
-                response_value = yaw;
-                break;
-        }
-    }
-    
-    RCLCPP_INFO(node_->get_logger(), "VRPN驱动 - 关节%d: 四元数(%.3f,%.3f,%.3f,%.3f) -> 欧拉角(%.3f,%.3f,%.3f) -> 响应轴:%s(%.3f) -> %d个有效角度", 
-                joint_id, quaternion_x, quaternion_y, quaternion_z, quaternion_w, 
-                roll, pitch, yaw, response_axis.c_str(), response_value, valid_angles);
-    
-    // 显示映射后的关节角度
-    for (const auto& pair : joint_angles) {
-        if (std::abs(pair.second) >= 0.0001f) {  // 只显示非零角度
-            RCLCPP_INFO(node_->get_logger(), "  关节%d -> 角度%.3f", pair.first, pair.second);
-        }
-    }
-    
-    return valid_angles > 0;
+
+    // 下发电机命令
+    low_cmd_.motor_cmd[joint_id].q = angle;
+    low_cmd_.motor_cmd[joint_id].mode = 1;  // 启用电机
+    low_cmd_.motor_cmd[joint_id].kp = (joint_id < 13) ? 100.0f : 50.0f;
+    low_cmd_.motor_cmd[joint_id].kd = 1.0f;
+
+    return true;
 }
 
 bool G1Controller::simulateVrpnPoseData(int sensor_id, double quaternion_x, double quaternion_y, 
@@ -495,9 +368,7 @@ void G1Controller::enableArmSwingSimulation(bool enable) {
     arm_swing_time_ = 0.0;
     
     if (enable) {
-        RCLCPP_INFO(node_->get_logger(), "手臂摇摆模拟已启用");
     } else {
-        RCLCPP_INFO(node_->get_logger(), "手臂摇摆模拟已禁用");
     }
 }
 
@@ -566,7 +437,6 @@ void G1Controller::quaternionToEulerAngles(double qx, double qy, double qz, doub
     // 四元数归一化
     double norm = std::sqrt(qx*qx + qy*qy + qz*qz + qw*qw);
     if (norm < 1e-8) {
-        RCLCPP_WARN(node_->get_logger(), "四元数幅度过小，使用默认值");
         roll = pitch = yaw = 0.0;
         return;
     }
@@ -606,8 +476,7 @@ void G1Controller::quaternionToEulerAngles(double qx, double qy, double qz, doub
     
     // 将欧拉角从动补坐标系转换到Unitree坐标系
     // 这相当于绕Z轴旋转-90度，然后交换X和Y轴
-    double cos_90 = 0.0;
-    double sin_90 = 1.0;
+    // 移除未使用变量
     
     // 应用坐标系转换
     double temp_roll = raw_roll;

@@ -29,28 +29,16 @@ include_directories(${EIGEN3_INCLUDE_DIRS})
 include_directories(include)
 
 
-# 添加测试程序
-add_executable(vrpn_topic_test 
-  test/vrpn_topic_test.cpp
-)
-
-# 添加新的测试节点
-add_executable(vrpn_test_node 
-  src/vrpn_test_node.cpp
+# 添加主程序
+add_executable(motion_robot_node 
+  src/main.cpp
   src/motion_robot.cpp
   src/g1_controller.cpp
   src/motor_crc.cpp
   src/topic_data_getter.cpp
 )
 
-ament_target_dependencies(vrpn_topic_test 
-  rclcpp 
-  std_msgs 
-  geometry_msgs
-  sensor_msgs
-)
-
-ament_target_dependencies(vrpn_test_node 
+ament_target_dependencies(motion_robot_node 
   rclcpp 
   std_msgs 
   geometry_msgs
@@ -64,9 +52,7 @@ install(DIRECTORY include/
   DESTINATION include
 )
  
-install(TARGETS vrpn_test_node)
-
-install(TARGETS vrpn_topic_test)
+install(TARGETS motion_robot_node)
 
 
 # 安装launch文件
